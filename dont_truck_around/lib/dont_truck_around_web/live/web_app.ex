@@ -18,41 +18,63 @@ defmodule DontTruckAroundWeb.Live.WebApp do
   end
 
   def render(assigns) do
-    trucks_html = ~H"""
-    <div>
-      <h1>Food Truck Finder</h1>
+    food_trucks_json = Jason.encode!(assigns.food_trucks)
 
-      <form phx-submit="submit_filters">
-        <label>
-          Vegetarian:
-          <input
-            type="checkbox"
-            name="filters[vegetarian]"
-            value="true"
-            checked={@filters["vegetarian"]}
-          />
-        </label>
-        <label>
-          Vegan:
-          <input type="checkbox" name="filters[vegan]" value="true" checked={@filters["vegan"]} />
-        </label>
-        <label>
-          Gluten-Free:
-          <input
-            type="checkbox"
-            name="filters[gluten_free]"
-            value="true"
-            checked={@filters["gluten_free"]}
-          />
-        </label>
-        <button type="submit">Apply Filters</button>
+    trucks_html = ~H"""
+    <div class="ui" style="max-width: 1200px; margin: 0 auto; padding: 8px; overflow-y: 600px;">
+      <h1 class="ui">Food Truck Finder</h1>
+      <br />
+      <form phx-submit="submit_filters" class="ui form">
+        <div class="ui segment">
+          <h4 class="ui dividing header">Filters</h4>
+          <div class="inline fields">
+            <div class="field">
+              <div class="ui checkbox">
+                <input
+                  type="checkbox"
+                  name="filters[vegetarian]"
+                  value="true"
+                  checked={@filters["vegetarian"]}
+                />
+                <label>Vegetarian</label>
+              </div>
+            </div>
+            <div class="field">
+              <div class="ui checkbox">
+                <input type="checkbox" name="filters[vegan]" value="true" checked={@filters["vegan"]} />
+                <label>Vegan</label>
+              </div>
+            </div>
+            <div class="field">
+              <div class="ui checkbox">
+                <input
+                  type="checkbox"
+                  name="filters[gluten_free]"
+                  value="true"
+                  checked={@filters["gluten_free"]}
+                />
+                <label>Gluten-Free</label>
+              </div>
+            </div>
+            <div class="field">
+              <br />
+              <button type="submit" class="ui primary button">Apply Filters</button>
+            </div>
+          </div>
+        </div>
       </form>
 
-      <div id="truck-list">
+      <div
+        id="truck-list"
+        class="ui segment"
+        style="max-width: 1200px; margin: 0 auto; padding: 0; overflow-y: 600px;"
+      >
         <%= if Enum.empty?(@food_trucks) do %>
-          <p>No food trucks found.</p>
+          <div>
+            <p>No food trucks found.</p>
+          </div>
         <% else %>
-          <table class="truck-table">
+          <table class="ui celled table">
             <thead>
               <tr>
                 <th>Applicant</th>
@@ -78,11 +100,38 @@ defmodule DontTruckAroundWeb.Live.WebApp do
           </table>
         <% end %>
       </div>
-      
-      <div id="google-maps">
-        <!-- Google Maps integration here -->
-      </div>
     </div>
+    <div id="google-maps" class="ui segment" style="height: 400px;">
+      <!-- Google Maps integration here -->
+    </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=">
+    </script>
+    <script>
+      function initMap() {
+        var mapElement = document.getElementById('google-maps');
+        var mapOptions = {
+          zoom: 12,
+          center: { lat: 37.7749, lng: -122.4194 }  // Default center (San Francisco)
+        };
+        var map = new google.maps.Map(mapElement, mapOptions);
+
+        var foodTrucks = <% raw food_trucks_json %>;
+
+        for (var i = 0; i < foodTrucks.length; i++) {
+          var truck = foodTrucks[i];
+          var marker = new google.maps.Marker({
+            position: { lat: parseFloat(truck["Latitude"]), lng: parseFloat(truck["Longitude"]) },
+            map: map,
+            title: truck["Applicant"]
+          });
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        initMap();
+      });
+    </script>
     """
   end
 
