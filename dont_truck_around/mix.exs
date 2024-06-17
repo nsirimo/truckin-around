@@ -53,7 +53,8 @@ defmodule DontTruckAround.MixProject do
       {:jason, "~> 1.4"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.2"},
-      {:nimble_csv, "~> 1.2"}
+      {:nimble_csv, "~> 1.2"},
+      {:mox, "~> 1.0", only: :test}
     ]
   end
 

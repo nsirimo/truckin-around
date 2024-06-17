@@ -3,184 +3,226 @@ defmodule DontTruckAroundWeb.Live.WebApp do
 
   alias DontTruckAround.Impl.ApiService
 
-  @initial_state %{
-    food_trucks: [],
-    filters: %{"vegetarian" => false, "vegan" => false, "gluten_free" => false}
-  }
+  @typedoc """
+  Represents a geographic point with latitude and longitude.
+  """
+  @type geo_point :: {float(), float()}
 
+  @typedoc """
+  Represents a food truck location with its geographic coordinates and density.
+  """
+  @type food_truck_location :: %{
+          lat: float(),
+          lng: float(),
+          density: integer()
+        }
+
+  @typedoc """
+  Represents an office location with its geographic coordinates and foot traffic potential.
+  """
+  @type office_location :: %{
+          lat: float(),
+          lng: float(),
+          foot_traffic: integer()
+        }
   def mount(_params, _session, socket) do
-    {:noreply, initial_socket} =
-      socket
-      |> assign(@initial_state)
-      |> fetch_and_assign_food_trucks()
+    {:ok,
+     socket
+     |> assign(:targets, list_targets())}
+  end
 
-    {:ok, initial_socket}
+  def handle_event("update_targets", _params, socket) do
+    {:noreply,
+     socket
+     |> push_event(
+       "update_markers",
+       %{data: list_targets()}
+     )}
   end
 
   def render(assigns) do
-    food_trucks_json = Jason.encode!(assigns.food_trucks)
-
-    trucks_html = ~H"""
-    <div class="ui" style="max-width: 1200px; margin: 0 auto; padding: 8px; overflow-y: 600px;">
-      <h1 class="ui">Food Truck Finder</h1>
-      <br />
-      <form phx-submit="submit_filters" class="ui form">
-        <div class="ui segment">
-          <h4 class="ui dividing header">Filters</h4>
-          <div class="inline fields">
-            <div class="field">
-              <div class="ui checkbox">
-                <input
-                  type="checkbox"
-                  name="filters[vegetarian]"
-                  value="true"
-                  checked={@filters["vegetarian"]}
-                />
-                <label>Vegetarian</label>
-              </div>
-            </div>
-            <div class="field">
-              <div class="ui checkbox">
-                <input type="checkbox" name="filters[vegan]" value="true" checked={@filters["vegan"]} />
-                <label>Vegan</label>
-              </div>
-            </div>
-            <div class="field">
-              <div class="ui checkbox">
-                <input
-                  type="checkbox"
-                  name="filters[gluten_free]"
-                  value="true"
-                  checked={@filters["gluten_free"]}
-                />
-                <label>Gluten-Free</label>
-              </div>
-            </div>
-            <div class="field">
-              <br />
-              <button type="submit" class="ui primary button">Apply Filters</button>
-            </div>
-          </div>
+    ~H"""
+    <div class="min-h-screen bg-gray-100 flex flex-col items-center">
+      <!-- Header -->
+      <header class="w-full bg-blue-600 text-white p-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 class="text-3xl font-bold">Don't Truck Around!</h1>
         </div>
-      </form>
-
-      <div
-        id="truck-list"
-        class="ui segment"
-        style="max-width: 1200px; margin: 0 auto; padding: 0; overflow-y: 600px;"
-      >
-        <%= if Enum.empty?(@food_trucks) do %>
-          <div>
-            <p>No food trucks found.</p>
-          </div>
-        <% else %>
-          <table class="ui celled table">
-            <thead>
-              <tr>
-                <th>Applicant</th>
-                <th>Food Items</th>
-                <th>Location</th>
-                <th>Facility Type</th>
-                <th>Latitude</th>
-                <th>Longitude</th>
-              </tr>
-            </thead>
-            <tbody>
-              <%= for truck <- @food_trucks do %>
-                <tr class="truck">
-                  <td><%= truck["Applicant"] %></td>
-                  <td><%= truck["FoodItems"] %></td>
-                  <td><%= truck["LocationDescription"] %></td>
-                  <td><%= truck["FacilityType"] %></td>
-                  <td><%= truck["Latitude"] %></td>
-                  <td><%= truck["Longitude"] %></td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        <% end %>
-      </div>
+      </header>
+      <main class="flex-grow w-full max-w-4xl mx-auto mt-8 px-4">
+        <section class="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 class="text-2xl font-semibold mb-4">
+            Want to know the best place to park your food truck?
+          </h2>
+          <p class="text-gray-700 mb-4">
+            This website will help you find the best place to park your food truck based on office and neighborhood density. Just enter in an address and see where the nearest place to park is within 10 miles! Don't Truck Around, let us do it for you!
+          </p>
+          <p>
+            Our current location we are using to determine best parking spots is lat: "37.7749", lng: "-122.4194"
+          </p>
+          <!-- <button -->
+          <!--   phx-click="update_targets" -->
+          <!--   class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50" -->
+          <!-- > -->
+          <!--  -->
+          <!-- </button> -->
+        </section>
+        <div
+          id="googleMap"
+          class="w-full bg-slate-100"
+          style="height: 750px;"
+          phx-hook="GMaps"
+          phx-update="ignore"
+          data-targets={Jason.encode!(@targets)}
+        >
+        </div>
+      </main>
     </div>
-    <div id="google-maps" class="ui segment" style="height: 400px;">
-      <!-- Google Maps integration here -->
-    </div>
-
-    <script src="https://maps.googleapis.com/maps/api/js?key=">
-    </script>
-    <script>
-      function initMap() {
-        var mapElement = document.getElementById('google-maps');
-        var mapOptions = {
-          zoom: 12,
-          center: { lat: 37.7749, lng: -122.4194 }  // Default center (San Francisco)
-        };
-        var map = new google.maps.Map(mapElement, mapOptions);
-
-        var foodTrucks = <% raw food_trucks_json %>;
-
-        for (var i = 0; i < foodTrucks.length; i++) {
-          var truck = foodTrucks[i];
-          var marker = new google.maps.Marker({
-            position: { lat: parseFloat(truck["Latitude"]), lng: parseFloat(truck["Longitude"]) },
-            map: map,
-            title: truck["Applicant"]
-          });
-        }
-      }
-
-      document.addEventListener('DOMContentLoaded', function() {
-        initMap();
-      });
-    </script>
     """
   end
 
-  def handle_event("submit_filters", %{"filters" => filters}, socket) do
-    socket |> assign(filters: filters) |> fetch_and_assign_food_trucks()
-  end
-
-  def fetch_and_assign_food_trucks(socket) do
+  defp fetch_food_truck_data() do
     case ApiService.fetch_food_truck_data() do
       {:ok, trucks} ->
-        # TODO: filtering not working right now, due to data set not containing type of food
-        # filtered_trucks = filter_food_trucks(trucks, socket.assigns.filters)
-        filtered_trucks =
-          trucks
-          # |> Enum.filter(&filter_truck/1)
-          |> Enum.map(fn truck ->
-            %{
-              "Applicant" => truck["Applicant"],
-              "FoodItems" => truck["FoodItems"],
-              "LocationDescription" => truck["LocationDescription"],
-              "FacilityType" => truck["FacilityType"],
-              "Latitude" => truck["Latitude"],
-              "Longitude" => truck["Longitude"]
-            }
-          end)
+        trucks
+        |> Enum.map(fn truck ->
+          %{
+            "Applicant" => truck["Applicant"],
+            "FoodItems" => truck["FoodItems"],
+            "LocationDescription" => truck["LocationDescription"],
+            "FacilityType" => truck["FacilityType"],
+            "Latitude" => truck["Latitude"],
+            "Longitude" => truck["Longitude"]
+          }
+        end)
 
-        {:noreply, assign(socket, food_trucks: filtered_trucks)}
-
-      {:error, _reason} ->
-        {:noreply, socket}
+      {:error, reason} ->
+        {:noreply, reason}
     end
   end
 
-  defp filter_truck(truck) do
-    # TODO: will need to see if there are any other ways to tell if a food truck is approved/active
-    # currently the dataset shows nil for all trucks, must be a bug on their end
-    # truck["Approved"] == "TRUE"
+  defp fetch_office_data() do
+    case ApiService.fetch_office_data() do
+      {:ok, offices} ->
+        offices
+        |> Enum.map(fn office ->
+          %{
+            "Name" => office["DBA Name"],
+            "Address" => office["Street Address"],
+            "Zip" => office["Source Zipcode"],
+            "City" => office["City"],
+            "FootTraffic" => office["Analysis Neighborhoods"],
+            "Latitude" => office["Latitude"],
+            "Longitude" => office["Longitude"]
+          }
+        end)
+
+      {:error, reason} ->
+        {:noreply, reason}
+    end
   end
 
-  defp filter_food_trucks(trucks, filters) do
-    trucks
-    |> Enum.filter(fn truck ->
-      matches_filters?(truck, filters)
+  defp list_targets() do
+    # TODO: Change to lat/lng from user input
+    find_best_parking_locations(%{lat: "37.7749", lng: "-122.4194"})
+    |> Enum.map(fn {lat, lng} ->
+      %{
+        lat: lat,
+        lng: lng
+      }
     end)
   end
 
-  defp matches_filters?(truck, filters) do
-    Enum.all?(filters, fn {filter_key, filter_value} ->
-      Map.get(truck, String.to_atom(filter_key)) == filter_value
+  @doc """
+  Calculates the foot traffic score for a given food truck location based on nearby offices.
+
+  Returns an integer score.
+  """
+  @spec calculate_foot_traffic_score(
+          offices :: [office_location],
+          food_truck_location
+        ) :: integer
+  def calculate_foot_traffic_score(offices, food_truck) do
+    Enum.reduce(offices, 0, fn office, acc ->
+      distance_km =
+        haversine_distance(
+          {office["Latitude"], office["Longitude"]},
+          {food_truck["Latitude"], food_truck["Longitude"]}
+        )
+
+      # Adjust the radius as needed
+      if distance_km <= 10.0 do
+        acc + office["FootTraffic"]
+      else
+        acc
+      end
     end)
+  end
+
+  @doc """
+  Finds the top 3 locations to park a food truck based on foot traffic within a 10-mile radius.
+
+  Returns a list of `geo_point` representing the best parking locations.
+  """
+  @spec find_best_parking_locations(address :: geo_point) :: [geo_point]
+  def find_best_parking_locations(address) do
+    food_trucks = fetch_food_truck_data()
+    offices = fetch_office_data()
+
+    address_latlng = {address.lat, address.lng}
+    # Filter food trucks within 30 miles of the address
+    filtered_food_trucks =
+      Enum.filter(food_trucks, fn truck ->
+        (truck["Latitude"] != "0" || truck["Longitude"] != "0") &&
+          haversine_distance(address_latlng, {truck["Latitude"], truck["Longitude"]}) <= 10.0
+      end)
+
+    # Filter offices within 30 miles of the address
+    filtered_offices =
+      Enum.filter(offices, fn office ->
+        (office["Latitude"] != "0" || office["Longitude"] != "0") &&
+          haversine_distance(address_latlng, {office["Latitude"], office["Longitude"]}) <= 10.0
+      end)
+
+    all_locations_with_scores =
+      Enum.map(filtered_food_trucks, fn truck ->
+        foot_traffic_score = calculate_foot_traffic_score(filtered_offices, truck)
+
+        {foot_traffic_score, truck}
+      end)
+
+    top_locations =
+      Enum.take(
+        Enum.sort(all_locations_with_scores, fn {score1, _}, {score2, _} -> score1 >= score2 end),
+        3
+      )
+
+    Enum.map(top_locations, fn {_score, truck} -> {truck["Latitude"], truck["Longitude"]} end)
+  end
+
+  defp haversine_distance({lat1, lng1}, {lat2, lng2}) do
+    lat1 = String.to_float(lat1)
+    lng1 = String.to_float(lng1)
+    lat2 = String.to_float(lat2)
+    lng2 = String.to_float(lng2)
+    # Radius of the Earth in kilometers
+    earth_radius = 6371.0
+
+    delta_lat = to_radians(lat2 - lat1)
+    delta_lng = to_radians(lng2 - lng1)
+
+    a =
+      :math.sin(delta_lat / 2.0) * :math.sin(delta_lat / 2.0) +
+        :math.cos(to_radians(lat1)) * :math.cos(to_radians(lat2)) *
+          :math.sin(delta_lng / 2.0) * :math.sin(delta_lng / 2.0)
+
+    c = 2.0 * :math.atan2(:math.sqrt(a), :math.sqrt(1.0 - a))
+
+    # Distance in kms
+    earth_radius * c
+  end
+
+  defp to_radians(degrees) do
+    degrees * :math.pi() / 180.0
   end
 end
