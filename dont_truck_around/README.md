@@ -1,4 +1,5 @@
 # DontTruckAround
+![App Screenshot](https://github.com/nsirimo/truckin-around/assets/24559644/f3da9634-9922-4ddc-b2c4-baa1a5134796)
 
 ## Introduction
 
