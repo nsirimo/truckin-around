@@ -31,7 +31,7 @@ The idea is we Dont Truck Around! My app will take in an address or coordinates,
 ## Setup and Startup
 
 Before starting the server, please unzip the office-data-sf.csv.zip file in assets as this is a large data set so I had to zip it.
-
+You will also need to set up your API key with google then place it in the hooks.js file at the top.
 To get your Phoenix server up and running:
 
 1. Run `mix setup` to install and set up dependencies.
